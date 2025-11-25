@@ -17,7 +17,7 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        // ConversationMembers: xóa conversation sẽ xóa member, nhưng xóa user không cascade
+
         modelBuilder.Entity<ConversationMember>()
             .HasKey(cm => new { cm.ConversationId, cm.UserId });
 
@@ -34,7 +34,7 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
 
-        // Messages: xóa conversation xóa message, nhưng xóa user không cascade
+
         modelBuilder.Entity<Message>()
             .HasOne(m => m.Sender)
             .WithMany()
@@ -47,7 +47,7 @@ public class AppDbContext : DbContext
             .HasForeignKey(m => m.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // Conversations: xóa user sẽ xóa conversation
+
         modelBuilder.Entity<Conversation>()
             .HasOne(c => c.CreatedByUser)
             .WithMany()
