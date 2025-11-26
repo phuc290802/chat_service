@@ -11,12 +11,16 @@ namespace ChatApp.Infrastructure.Services
     public class TokenService : ITokenService
     {
         private readonly string _jwtSecret;
+        private readonly string _jwtIssuer;
+        private readonly string _jwtAudience;
         private readonly int _jwtLifespanMinutes;
 
         public TokenService(IConfiguration configuration)
         {
             _jwtSecret = configuration["Jwt:Secret"]!;
             _jwtLifespanMinutes = int.Parse(configuration["Jwt:AccessTokenExpirationMinutes"]!);
+            _jwtIssuer = configuration["Jwt:Issuer"]!;
+            _jwtAudience = configuration["Jwt:Audience"]!;
         }
 
         public string GenerateAccessToken(User user)
@@ -31,6 +35,8 @@ namespace ChatApp.Infrastructure.Services
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
+                issuer: _jwtIssuer,
+                audience: _jwtAudience,
                 claims: claims,
                 expires: DateTime.UtcNow.AddMinutes(_jwtLifespanMinutes),
                 signingCredentials: creds
