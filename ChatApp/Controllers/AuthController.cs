@@ -1,6 +1,7 @@
-﻿using ChatApp.Application.DTOs;
-using ChatApp.Application.Interfaces;
+﻿using ChatApp.Application.Interfaces;
+using ChatApp.Application.DTOs;
 using Microsoft.AspNetCore.Mvc;
+
 
 [ApiController]
 [Route("api/[controller]")]
@@ -25,5 +26,20 @@ public class AuthController : ControllerBase
     {
         var response = await _authService.LoginAsync(request);
         return Ok(response);
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshRequest request)
+    {
+        var result = await _authService.RefreshTokenAsync(request.RefreshToken);
+
+        if (!result.IsSuccess)
+            return Unauthorized(new { message = result.ErrorMessage });
+
+        return Ok(new
+        {
+            accessToken = result.AccessToken,
+            refreshToken = result.RefreshToken 
+        });
     }
 }

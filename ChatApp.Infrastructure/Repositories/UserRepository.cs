@@ -24,8 +24,14 @@ public class UserRepository : IUserRepository
     public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default) => 
         _db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Email == email, ct);
 
+    public Task<User?> GetByIdAsync(Guid userId, CancellationToken ct = default) =>
+        _db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.Id == userId, ct);
+    
     public Task<User?> GetByUserNameAsync(string userName, CancellationToken ct = default) =>
          _db.Users.AsNoTracking().FirstOrDefaultAsync(user => user.UserName == userName, ct);
 
-    public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+    public Task SaveChangesAsync(CancellationToken ct = default) => 
+        _db.SaveChangesAsync(ct);
+
+
 }
