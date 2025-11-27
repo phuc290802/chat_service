@@ -1,7 +1,10 @@
-﻿using ChatApp.Application.DTOs;
+﻿using Azure.Core;
+using ChatApp.Application.DTOs;
 using ChatApp.Application.Interfaces;
 using ChatApp.Domain.Entities;
+using ChatApp.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 
 namespace ChatApp.Application.Services
 {
@@ -11,18 +14,21 @@ namespace ChatApp.Application.Services
         private readonly ITokenService _tokenService;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IPasswordHasher<User> _passwordHasher;
+        private readonly ILogger<AuthService> _logger;
 
         public AuthService(
             IUserRepository userRepository,
             ITokenService tokenService,
             IPasswordHasher<User> passwordHasher,
-            IRefreshTokenRepository refreshTokenRepository
+            IRefreshTokenRepository refreshTokenRepository,
+            ILogger<AuthService> logger
             )
         {
             _userRepository = userRepository;
             _tokenService = tokenService;
             _passwordHasher = passwordHasher;
             _refreshTokenRepository = refreshTokenRepository;
+            _logger = logger;
         }
 
         public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
@@ -52,16 +58,7 @@ namespace ChatApp.Application.Services
             var accessToken = _tokenService.GenerateAccessToken(user);
             var refreshToken = _tokenService.GenerateRefreshToken(user);
 
-            var refreshTokenEntity = new RefreshToken
-            {
-                Token = refreshToken,
-                UserId = user.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _refreshTokenRepository.AddAsync(refreshTokenEntity, ct);
-            await _refreshTokenRepository.SaveChangesAsync(ct);
+            _ = SaveRefreshTokenAsync(user, refreshToken, ct);
 
             return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl, user.CreatedAt));
         }
@@ -78,16 +75,7 @@ namespace ChatApp.Application.Services
             var accessToken = _tokenService.GenerateAccessToken(user);
             var refreshToken = _tokenService.GenerateRefreshToken(user);
 
-            var refreshTokenEntity = new RefreshToken
-            {
-                Token = refreshToken,
-                UserId = user.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _refreshTokenRepository.AddAsync(refreshTokenEntity, ct);
-            await _refreshTokenRepository.SaveChangesAsync(ct);
+            _ = SaveRefreshTokenAsync(user, refreshToken, ct);
 
             return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl, user.CreatedAt));
         }
@@ -97,27 +85,63 @@ namespace ChatApp.Application.Services
             var tokenEntity = await _refreshTokenRepository.GetValidTokenAsync(refreshToken);
 
             if (tokenEntity == null)
+            {
+                _logger.LogWarning("Invalid refresh token attempt: {Token}",
+                    refreshToken.Substring(0, 10) + "...");
                 return RefreshTokenResult.Fail("Invalid token");
+            }
+
+            if (tokenEntity.ExpiresAt <= DateTime.UtcNow)
+            {
+                _logger.LogWarning("Expired refresh token used for user {UserId}",
+                    tokenEntity.UserId);
+                return RefreshTokenResult.Fail("Token expired");
+            }
 
             var user = await _userRepository.GetByIdAsync(tokenEntity.UserId);
             if (user == null)
+            {
+                _logger.LogError("User not found for valid refresh token. UserId: {UserId}, Token: {TokenId}",
+                    tokenEntity.UserId, tokenEntity.Id);
                 return RefreshTokenResult.Fail("User not found");
+            }
 
-            var newAccessToken = _tokenService.GenerateAccessToken(user);
-            var newRefreshToken = _tokenService.GenerateRefreshToken(user);
+            _logger.LogInformation("Refreshing tokens for user {UserId}", user.Id);
 
+            await _refreshTokenRepository.RemoveOldTokenAsync(refreshToken);
+
+            try
+            {
+                await _refreshTokenRepository.RemoveOldTokenAsync(refreshToken);
+
+                var newAccessToken = _tokenService.GenerateAccessToken(user);
+                var newRefreshToken = _tokenService.GenerateRefreshToken(user);
+
+                await SaveRefreshTokenAsync(user, newRefreshToken, ct);
+
+                _logger.LogInformation("Tokens refreshed successfully for user {UserId}", user.Id);
+
+                return RefreshTokenResult.Success(newAccessToken, newRefreshToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to refresh tokens for user {UserId}", user.Id);
+                throw;
+            }
+        }
+
+        private async Task SaveRefreshTokenAsync(User user, string refreshToken, CancellationToken ct = default)
+        {
             var refreshTokenEntity = new RefreshToken
             {
-                Token = newRefreshToken,
+                Token = refreshToken,
                 UserId = user.Id,
-                ExpiresAt = DateTime.UtcNow.AddDays(7),
+                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
                 CreatedAt = DateTime.UtcNow
             };
 
             await _refreshTokenRepository.AddAsync(refreshTokenEntity, ct);
             await _refreshTokenRepository.SaveChangesAsync(ct);
-
-            return RefreshTokenResult.Success(newAccessToken, newRefreshToken);
         }
     }
 }

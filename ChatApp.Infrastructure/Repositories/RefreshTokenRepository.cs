@@ -22,6 +22,9 @@ namespace ChatApp.Infrastructure.Repositories
         public async Task<RefreshToken> GetValidTokenAsync(string token, CancellationToken ct = default) =>
             await _db.RefreshTokens.FirstOrDefaultAsync(x => x.Token == token, ct);
 
+        public async Task RemoveOldTokenAsync(string token, CancellationToken ct = default) =>
+            await _db.RefreshTokens.Where(x => x.Token == token).ExecuteDeleteAsync();
+
         public async Task SaveChangesAsync(CancellationToken ct = default) =>
             await _db.SaveChangesAsync(ct);
     }

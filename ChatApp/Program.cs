@@ -1,41 +1,74 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ChatApp.Infrastructure.Persistence;
-using ChatApp.Application.Interfaces;
-using ChatApp.Infrastructure.Repositories;
+﻿using ChatApp.Application.Interfaces;
 using ChatApp.Application.Services;
-using Microsoft.AspNetCore.Identity;
+using ChatApp.Infrastructure.Persistence;
+using ChatApp.Infrastructure.Repositories;
 using ChatApp.Infrastructure.Services;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
 
-
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<ITokenService, TokenService>();
-builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
-builder.Services.AddScoped<IPasswordHasher<ChatApp.Domain.Entities.User>, PasswordHasher<ChatApp.Domain.Entities.User>>();
-
-
-builder.Services.AddControllers();
-builder.Services.AddJwtAuthentication(builder.Configuration);
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
+try
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    builder.Services.AddDbContext<AppDbContext>(options =>
+    {
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+        options.LogTo(message => Log.Information("SQL: {Sql}", message), LogLevel.Information);
+    });
+
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowFrontend",
+            policy =>
+            {
+                policy.WithOrigins("http://localhost:5173")
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
+    });
+
+    builder.Services.AddScoped<IUserRepository, UserRepository>();
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<ITokenService, TokenService>();
+    builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+    builder.Services.AddScoped<IPasswordHasher<ChatApp.Domain.Entities.User>, PasswordHasher<ChatApp.Domain.Entities.User>>();
+
+    builder.Host.UseSerilog();
+    builder.Services.AddControllers();
+    builder.Services.AddJwtAuthentication(builder.Configuration);
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
+    var app = builder.Build();
+
+    app.UseMiddleware<RequestLoggingMiddleware>();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseCors("AllowFrontend");
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapControllers();
+
+    Log.Information("Application started successfully");
+    app.Run();
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application startup failed");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

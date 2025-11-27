@@ -12,5 +12,6 @@ namespace ChatApp.Application.Interfaces
         Task AddAsync(RefreshToken refreshToken, CancellationToken ct = default);
         Task<RefreshToken> GetValidTokenAsync(string token, CancellationToken ct = default);
         Task SaveChangesAsync(CancellationToken ct = default);
+        Task RemoveOldTokenAsync(string token, CancellationToken ct = default);
     }
 }
