@@ -33,8 +33,6 @@ public class AppDbContext : DbContext
             .HasForeignKey(cm => cm.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
 
-
-
         modelBuilder.Entity<Message>()
             .HasOne(m => m.Sender)
             .WithMany()
@@ -46,7 +44,6 @@ public class AppDbContext : DbContext
             .WithMany(c => c.Messages)
             .HasForeignKey(m => m.ConversationId)
             .OnDelete(DeleteBehavior.Cascade);
-
 
         modelBuilder.Entity<Conversation>()
             .HasOne(c => c.CreatedByUser)
