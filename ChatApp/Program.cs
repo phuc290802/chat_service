@@ -1,4 +1,5 @@
-﻿using ChatApp.Application.Interfaces;
+﻿using ChatApp.API.Hubs;
+using ChatApp.Application.Interfaces;
 using ChatApp.Application.Services;
 using ChatApp.Infrastructure.Persistence;
 using ChatApp.Infrastructure.Repositories;
@@ -28,15 +29,25 @@ try
             {
                 policy.WithOrigins("http://localhost:5173")
                       .AllowAnyHeader()
-                      .AllowAnyMethod();
+                      .AllowAnyMethod()
+                      .AllowCredentials();
             });
     });
+
 
     builder.Services.AddScoped<IUserRepository, UserRepository>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IPasswordHasher<ChatApp.Domain.Entities.User>, PasswordHasher<ChatApp.Domain.Entities.User>>();
+
+
+    builder.Services.AddScoped<IMessageService, MessageService>();
+    builder.Services.AddScoped<IConversationService, ConversationService>();
+    builder.Services.AddScoped<IMessageRepository, MessageRepository>();
+    builder.Services.AddScoped<IConversationRepository, ConversationRepository>();
+
+    builder.Services.AddSignalR();
 
     builder.Host.UseSerilog();
     builder.Services.AddControllers();
@@ -45,6 +56,7 @@ try
     builder.Services.AddSwaggerGen();
 
     var app = builder.Build();
+
 
     app.UseMiddleware<RequestLoggingMiddleware>();
 
@@ -55,9 +67,16 @@ try
     }
 
     app.UseHttpsRedirection();
+
+
     app.UseCors("AllowFrontend");
+
     app.UseAuthentication();
     app.UseAuthorization();
+
+
+    app.MapHub<ChatHub>("/hub/chat");
+
     app.MapControllers();
 
     Log.Information("Application started successfully");
