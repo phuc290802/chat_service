@@ -12,4 +12,6 @@ public class Message
 
     public Conversation Conversation { get; set; } = default!;
     public User Sender { get; set; } = default!;
+    public ICollection<Attachment> Attachments { get; set; }
 }
+

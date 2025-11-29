@@ -20,7 +20,6 @@ public class DbTestController : ControllerBase
         var subClaim = User.FindFirst(JwtRegisteredClaimNames.Sub);
         var userId = subClaim?.Value;
 
-        // Log ra console
         Console.WriteLine($"Sub claim: {subClaim}");
         Console.WriteLine($"UserId: {userId}");
 
