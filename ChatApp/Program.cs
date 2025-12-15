@@ -27,7 +27,10 @@ try
         options.AddPolicy("AllowFrontend",
             policy =>
             {
-                policy.WithOrigins("http://localhost:5173")
+                policy.WithOrigins(
+                            "http://localhost:5173",
+                            "http://172.19.46.111:5173"
+                        )
                       .AllowAnyHeader()
                       .AllowAnyMethod()
                       .AllowCredentials();
@@ -40,7 +43,8 @@ try
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
     builder.Services.AddScoped<IPasswordHasher<ChatApp.Domain.Entities.User>, PasswordHasher<ChatApp.Domain.Entities.User>>();
-
+    builder.Services.AddScoped<IUserService, UserService>();
+    builder.Services.AddSingleton<IUserConnectionService, UserConnectionService>();
 
     builder.Services.AddScoped<IMessageService, MessageService>();
     builder.Services.AddScoped<IConversationService, ConversationService>();

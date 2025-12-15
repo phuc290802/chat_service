@@ -5,6 +5,7 @@ using ChatApp.Domain.Entities;
 using ChatApp.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
+using Microsoft.VisualBasic;
 
 namespace ChatApp.Application.Services
 {
@@ -12,6 +13,8 @@ namespace ChatApp.Application.Services
     {
         private readonly IUserRepository _userRepository;
         private readonly ITokenService _tokenService;
+        private readonly IUserService _userService;
+        private readonly IConversationRepository _conversationRepository;
         private readonly IRefreshTokenRepository _refreshTokenRepository;
         private readonly IPasswordHasher<User> _passwordHasher;
         private readonly ILogger<AuthService> _logger;
@@ -21,7 +24,9 @@ namespace ChatApp.Application.Services
             ITokenService tokenService,
             IPasswordHasher<User> passwordHasher,
             IRefreshTokenRepository refreshTokenRepository,
-            ILogger<AuthService> logger
+            ILogger<AuthService> logger,
+            IConversationRepository conversationRepository,
+            IUserService userService
             )
         {
             _userRepository = userRepository;
@@ -29,6 +34,8 @@ namespace ChatApp.Application.Services
             _passwordHasher = passwordHasher;
             _refreshTokenRepository = refreshTokenRepository;
             _logger = logger;
+            _conversationRepository = conversationRepository;
+            _userService = userService;
         }
 
         public async Task<AuthResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
@@ -58,9 +65,11 @@ namespace ChatApp.Application.Services
             var accessToken = _tokenService.GenerateAccessToken(user);
             var refreshToken = _tokenService.GenerateRefreshToken(user);
 
-            _ = SaveRefreshTokenAsync(user, refreshToken, ct);
+            await SaveRefreshTokenAsync(user, refreshToken, ct);
 
-            return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl, user.CreatedAt));
+            await _userService.CreateConversationsForNewUserAsync(user);
+
+            return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl));
         }
 
         public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -75,9 +84,9 @@ namespace ChatApp.Application.Services
             var accessToken = _tokenService.GenerateAccessToken(user);
             var refreshToken = _tokenService.GenerateRefreshToken(user);
 
-            _ = SaveRefreshTokenAsync(user, refreshToken, ct);
+            await SaveRefreshTokenAsync(user, refreshToken, ct);
 
-            return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl, user.CreatedAt));
+            return new AuthResponse(accessToken, refreshToken, new UserDto(user.Id, user.UserName, user.Email, user.DisplayName, user.AvatarUrl));
         }
 
         public async Task<RefreshTokenResult> RefreshTokenAsync(string refreshToken, CancellationToken ct)
@@ -136,7 +145,7 @@ namespace ChatApp.Application.Services
             {
                 Token = refreshToken,
                 UserId = user.Id,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                ExpiresAt = DateTime.UtcNow.AddDays(7),
                 CreatedAt = DateTime.UtcNow
             };
 
