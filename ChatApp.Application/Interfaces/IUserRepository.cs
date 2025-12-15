@@ -9,5 +9,4 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Guid userId, CancellationToken ct = default);
     Task AddAsync(User user, CancellationToken ct = default);
     Task SaveChangesAsync(CancellationToken ct = default);
-    Task<List<User>> GetAllUser(CancellationToken ct = default);
 }

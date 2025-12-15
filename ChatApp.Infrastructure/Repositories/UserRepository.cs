@@ -33,6 +33,5 @@ public class UserRepository : IUserRepository
     public Task SaveChangesAsync(CancellationToken ct = default) => 
         _db.SaveChangesAsync(ct);
 
-    public Task<List<User>> GetAllUser(CancellationToken ct = default) =>
-        _db.Users.AsNoTracking().ToListAsync(ct);
+
 }

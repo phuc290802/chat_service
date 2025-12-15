@@ -10,6 +10,5 @@ namespace ChatApp.Application.Interfaces
         Task<bool> IsUserInConversationAsync(Guid conversationId, Guid userId);
         Task<List<Conversation>> GetUserConversationsAsync(Guid userId);
         Task<List<ConversationMember>> GetConversationMembersAsync(Guid conversationId);
-        Task <Conversation> GetByIdAsync(Guid conversationId, CancellationToken ct = default);
     }
 }

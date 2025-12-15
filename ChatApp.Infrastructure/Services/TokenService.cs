@@ -38,10 +38,9 @@ namespace ChatApp.Infrastructure.Services
                 issuer: _jwtIssuer,
                 audience: _jwtAudience,
                 claims: claims,
-                expires: DateTime.UtcNow.AddSeconds(10),
+                expires: DateTime.UtcNow.AddMinutes(_jwtLifespanMinutes),
                 signingCredentials: creds
             );
-            Console.WriteLine("ValidTo UTC: " + token.ValidTo);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

@@ -14,22 +14,18 @@ namespace ChatApp.API.Hubs
         private readonly IMessageService _messageService;
         private readonly IConversationService _conversationService;
         private readonly ILogger<ChatHub> _logger;
-        private readonly IUserConnectionService _userConnectionService;
 
-        public ChatHub(IMessageService messageService, IConversationService conversationService, ILogger<ChatHub> logger, IUserConnectionService userConnectionService)
+        public ChatHub(IMessageService messageService, IConversationService conversationService, ILogger<ChatHub> logger)
         {
             _messageService = messageService;
             _conversationService = conversationService;
             _logger = logger;
-            _userConnectionService = userConnectionService;
         }
 
         public override async Task OnConnectedAsync()
         {
             var userId = GetUserIdFromContext();
             var connectionId = Context.ConnectionId;
-
-            _userConnectionService.Add(userId, Context.ConnectionId);
 
             var userConnection = new UserConnection
             {
@@ -45,7 +41,7 @@ namespace ChatApp.API.Hubs
             {
                 await Groups.AddToGroupAsync(connectionId, $"conversation_{conv.Id}");
             }
-            await Clients.All.SendAsync("UserOnline", userId);
+
             await base.OnConnectedAsync();
         }
 
@@ -53,14 +49,12 @@ namespace ChatApp.API.Hubs
         {
             var userId = GetUserIdFromContext();
             _connections.TryRemove(userId, out _);
-            _userConnectionService.Remove(userId, Context.ConnectionId);
 
             var userConversations = await _conversationService.GetUserConversationsAsync(userId);
             foreach (var conv in userConversations)
             {
                 await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"conversation_{conv.Id}");
             }
-            await Clients.All.SendAsync("UserOffline", userId);
             await base.OnDisconnectedAsync(exception);
         }
 
@@ -74,7 +68,6 @@ namespace ChatApp.API.Hubs
                 throw new HubException("You are not a member of this conversation");
             var message = new Message
             {
-                Id = Guid.NewGuid(),
                 ConversationId = request.ConversationId,
                 SenderId = senderId,
                 Content = request.Content,
@@ -97,47 +90,31 @@ namespace ChatApp.API.Hubs
             await Clients.Caller.SendAsync("MessageSent", new { MessageId = savedMessage.Id });
         }
 
-        public async Task JoinConversation(Guid conversationId)
+        public async Task JoinConverstation(Guid conversationId)
         {
             var userId = GetUserIdFromContext();
-            Console.WriteLine($"JoinConversation CALLED: User {userId} wants to join {conversationId}");
 
             var isMember = await _conversationService.IsUserInConversationAsync(conversationId, userId);
 
             if (!isMember)
-            {
-                Console.WriteLine("Join FAILED: user not in conversation");
                 throw new HubException("You are not a member of this conversation");
-            }
 
             await Groups.AddToGroupAsync(Context.ConnectionId, $"conversation_{conversationId}");
-            Console.WriteLine($"User {userId} JOINED GROUP conversation_{conversationId}");
-
             await Clients.Caller.SendAsync("JoinedConversation", conversationId);
         }
-
-        public async Task LeaveConversation(Guid conversationId)
-        {
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"conversation_{conversationId}");
-        }
-
 
         public async Task<List<string>> GetOnlineUsersInConversation(Guid conversationId)
         {
             var members = await _conversationService.GetConversationMembersAsync(conversationId);
-            var onlineUsers = _userConnectionService
-                .GetOnlineUsers(members.Select(m => m.UserId).ToList())
-                .Select(id => id.ToString())
+
+            var onlineUsers = members
+                .Where(m => _connections.ContainsKey(m.UserId))
+                .Select(m => m.UserId.ToString())
                 .ToList();
 
             return onlineUsers;
         }
 
-        public Task<List<Guid>> GetAllOnlineUsers()
-        {
-            var onlineUsers = _userConnectionService.GetAllOnlineUsers();
-            return Task.FromResult(onlineUsers);
-        }
 
         private Guid GetUserIdFromContext()
         {
