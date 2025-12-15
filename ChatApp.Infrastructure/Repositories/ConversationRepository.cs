@@ -53,11 +53,11 @@ namespace ChatApp.Infrastructure.Repositories
 
         public async Task<List<Conversation>> GetUserConversationsAsync(Guid userId)
         {
-            return await _context.ConversationMembers
-                .Where(cm => cm.UserId == userId)
-                .Include(cm => cm.Conversation)
-                .Select(cm => cm.Conversation)
-                .OrderByDescending(c => c.CreatedAt)
+            return await _context.Conversations
+                .Where(c => c.Members.Any(m => m.UserId == userId))
+                .Include(c => c.Members)
+                    .ThenInclude(m => m.User)
+                .Include(c => c.Messages)
                 .ToListAsync();
         }
 
@@ -67,6 +67,14 @@ namespace ChatApp.Infrastructure.Repositories
                 .Where(cm => cm.ConversationId == conversationId)
                 .Include(cm => cm.User)
                 .ToListAsync();
+        }
+
+        public async Task<Conversation> GetByIdAsync(Guid conversationId, CancellationToken ct = default)
+        {
+            return await _context.Conversations
+                    .Include(c => c.Members)
+                    .ThenInclude(m => m.User)
+                    .FirstOrDefaultAsync(conv => conv.Id == conversationId, ct);
         }
     }
 }
